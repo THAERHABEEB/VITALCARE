@@ -10,6 +10,7 @@ import Diseases from './pages/Diseases';
 import Articles from './pages/Articles';
 import Auth from './pages/Auth';
 import Footer from './components/Footer';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   useEffect(() => {
@@ -25,8 +26,16 @@ function App() {
       <div className="container" style={{ padding: '2rem 0' }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/diagnose" element={<Diagnosis />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/diagnose" element={
+            <ProtectedRoute>
+              <Diagnosis />
+            </ProtectedRoute>
+          } />
           <Route path="/diseases" element={<Diseases />} />
           <Route path="/articles" element={<Articles />} />
           <Route path="/auth" element={<Auth />} />
