@@ -2,7 +2,23 @@ import pandas as pd
 import numpy as np
 import os
 import re
-from thefuzz import fuzz
+from thefuzz import fuzz, process
+
+SLANG_DICT = {
+    "tummy ache": "stomach pain",
+    "puke": "vomiting",
+    "puking": "vomiting",
+    "throw up": "vomiting",
+    "throwing up": "vomiting",
+    "head hurts": "headache",
+    "runny nose": "continuous sneezing",
+    "fivver": "fever",
+    "fivor": "fever",
+    "shaking": "shivering",
+    "can't breathe": "breathlessness",
+    "poop blood": "bloody stool",
+    "chest hurts": "chest pain"
+}
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -62,24 +78,27 @@ class MedicalNLP:
             for s in selected_symptoms:
                 matched_symptoms.add(s.lower())
                 
-        # 2. Extract symptoms from free text using fuzzy matching
-        for symptom in self.all_symptoms:
-            if symptom in user_text:
-                matched_symptoms.add(symptom)
-            else:
-                # Fuzzy partial match for longer multi-word symptoms
-                if len(symptom) > 4:
-                    if fuzz.partial_ratio(symptom, user_text) > 85:
-                        matched_symptoms.add(symptom)
+        # 2. Pre-process slang/synonyms
+        for slang, medical_term in SLANG_DICT.items():
+            if slang in user_text:
+                matched_symptoms.add(medical_term)
+                user_text = user_text.replace(slang, "") # remove to avoid double matching
                 
-        # Also do a reverse check: fuzzy word match for single-word symptoms to catch typos
-        words = set(re.findall(r'\b\w+\b', user_text))
-        for word in words:
-            if len(word) > 3: # ignore very short words
-                for symptom in self.all_symptoms:
-                    if len(symptom.split()) == 1 and len(symptom) > 3:
-                        if fuzz.ratio(word, symptom) > 85:
-                            matched_symptoms.add(symptom)
+        # 3. Extract symptoms from free text using fuzzy matching
+        for symptom in self.all_symptoms:
+            if len(symptom) > 4 and fuzz.partial_ratio(symptom, user_text) > 85:
+                matched_symptoms.add(symptom)
+                
+        # Also do a reverse check: fuzzy word match to catch heavy typos (e.g. fivver -> fever)
+        words = [w for w in re.findall(r'\b\w+\b', user_text) if len(w) > 3]
+        if words:
+            # We use extractBests to find the top matches in the entire symptom list for each word
+            for word in words:
+                matches = process.extractBests(word, self.all_symptoms, score_cutoff=70, limit=2)
+                for match, score in matches:
+                    # If it's a single word symptom, accept it more easily
+                    if len(match.split()) == 1 or score > 85:
+                        matched_symptoms.add(match)
 
         if not matched_symptoms:
             return {"error": "Could not identify specific medical symptoms from your input. Please try using the quick-select options or describe symptoms more clearly (e.g., 'headache', 'fever', 'nausea')."}

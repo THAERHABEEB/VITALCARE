@@ -12,6 +12,7 @@ function Diagnosis() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [diagError, setDiagError] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(true);
 
   useEffect(() => {
@@ -38,9 +39,10 @@ function Diagnosis() {
     
     const currentSymptoms = symptoms || '';
     const currentTags = selectedTags || [];
+    setDiagError(null);
     
     if (currentSymptoms.trim() === '' && currentTags.length === 0) {
-      toast.error("Please describe your symptoms or select at least one from the quick-list above.");
+      setDiagError("Please describe your symptoms or select at least one from the quick-list above.");
       return;
     }
     
@@ -61,13 +63,12 @@ function Diagnosis() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setResult(response.data);
-      toast.success("Diagnosis complete!");
     } catch (err) {
       if (err.response?.status === 401) {
           localStorage.removeItem('vitalcare_token');
           setIsAuthorized(false);
       } else {
-          toast.error(err.response?.data?.detail || 'An error occurred during diagnosis. Make sure the backend is running.');
+          setDiagError(err.response?.data?.detail || 'An error occurred during diagnosis. Make sure the backend is running.');
       }
     } finally {
       setLoading(false);
@@ -140,10 +141,32 @@ function Diagnosis() {
             rows="5" 
             placeholder="E.g., I have a headache in the middle of my head, feeling dizzy..." 
             value={symptoms}
-            onChange={(e) => setSymptoms(e.target.value)}
+            onChange={(e) => { setSymptoms(e.target.value); setDiagError(null); }}
             style={{ resize: 'vertical', width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}
           ></textarea>
         </div>
+
+        {diagError && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            style={{ 
+              background: '#fef2f2', 
+              border: '1px solid #fecaca', 
+              color: '#b91c1c', 
+              padding: '1.2rem', 
+              borderRadius: '12px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.8rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+            }}
+          >
+            <AlertCircle size={24} color="#dc2626" />
+            <span style={{ fontSize: '1.05rem', lineHeight: '1.5' }}>{diagError}</span>
+          </motion.div>
+        )}
+
         <motion.button 
           type="submit" 
           className="btn-primary"

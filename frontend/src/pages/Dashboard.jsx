@@ -5,24 +5,6 @@ import { Users, Award, Calendar, TrendingUp, Activity, FileText, Target, Search,
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { Link } from 'react-router-dom';
 
-const trafficData = [
-  { name: 'Jan', patients: 400, accuracy: 92 },
-  { name: 'Feb', patients: 300, accuracy: 94 },
-  { name: 'Mar', patients: 550, accuracy: 96 },
-  { name: 'Apr', patients: 480, accuracy: 95 },
-  { name: 'May', patients: 700, accuracy: 98 },
-  { name: 'Jun', patients: 850, accuracy: 99 },
-];
-
-const diseaseData = [
-  { name: 'Fungal Infection', value: 400 },
-  { name: 'Allergy', value: 300 },
-  { name: 'GERD', value: 300 },
-  { name: 'Migraine', value: 200 },
-  { name: 'Malaria', value: 278 },
-  { name: 'Diabetes', value: 189 },
-];
-
 const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#f97316'];
 
 function Dashboard() {
@@ -151,7 +133,7 @@ function Dashboard() {
               <h3 style={{ marginBottom: '2rem', fontSize: '1.5rem' }}>Platform Usage Growth</h3>
               <div style={{ width: '100%', height: '320px' }}>
                 <ResponsiveContainer>
-                  <AreaChart data={trafficData}>
+                  <AreaChart data={stats.trafficData || []}>
                     <defs>
                       <linearGradient id="colorPv" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="var(--primary-color)" stopOpacity={0.3}/>
@@ -174,7 +156,7 @@ function Dashboard() {
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie
-                      data={diseaseData}
+                      data={stats.diseaseData || []}
                       cx="50%"
                       cy="50%"
                       innerRadius={80}
@@ -183,7 +165,7 @@ function Dashboard() {
                       dataKey="value"
                       stroke="none"
                     >
-                      {diseaseData.map((entry, index) => (
+                      {(stats.diseaseData || []).map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
