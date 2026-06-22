@@ -229,26 +229,3 @@ function Diagnosis() {
 }
 
 export default Diagnosis;
-{ med.image_url && <img src={med.image_url} alt={med.name} style={{ width: '100%', height: '180px', objectFit: 'contain', marginBottom: '1.5rem', borderRadius: '12px', background: '#f8fafc', padding: '1rem' }} /> }
-<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
-  <div style={{ background: 'var(--bg-light)', padding: '1rem', borderRadius: '12px' }}>
-    <p style={{ fontSize: '0.85rem', color: 'var(--primary-color)', margin: '0 0 0.3rem 0', fontWeight: 700, textTransform: 'uppercase' }}>Composition</p>
-    <p style={{ fontSize: '0.95rem', color: 'var(--text-dark)', margin: 0, fontWeight: 500 }}>{med.composition}</p>
-  </div>
-  <div style={{ background: '#fff1f2', padding: '1rem', borderRadius: '12px' }}>
-    <p style={{ fontSize: '0.85rem', color: '#e11d48', margin: '0 0 0.3rem 0', fontWeight: 700, textTransform: 'uppercase' }}>Side effects</p>
-    <p style={{ fontSize: '0.95rem', color: 'var(--text-dark)', margin: 0, fontWeight: 500 }}>{med.side_effects}</p>
-  </div>
-</div>
-                  </motion.div >
-                ))}
-              </div >
-            </motion.div >
-          )}
-        </motion.div >
-      )}
-    </motion.div >
-  );
-}
-
-export default Diagnosis;
