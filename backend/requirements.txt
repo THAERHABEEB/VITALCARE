@@ -8,3 +8,6 @@ python-jose
 python-multipart
 pydantic
 bcrypt
+thefuzz
+python-Levenshtein
+psycopg2-binary

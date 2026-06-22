@@ -30,12 +30,12 @@ function Auth() {
           email: formData.email,
           password: formData.password
         });
-        login(res.data.user);
+        login(res.data.user, res.data.access_token);
         setMessage({ type: 'success', text: res.data.message });
         setTimeout(() => navigate('/dashboard'), 1000);
       } else {
         const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/register`, formData);
-        login(res.data.user);
+        login(res.data.user, res.data.access_token);
         setMessage({ type: 'success', text: res.data.message });
         setTimeout(() => navigate('/dashboard'), 1000);
       }

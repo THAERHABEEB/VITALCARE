@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { Activity, AlertCircle, ShieldAlert, Pill, Check } from 'lucide-react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function Diagnosis() {
   const [symptoms, setSymptoms] = useState('');
@@ -9,7 +11,6 @@ function Diagnosis() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/symptoms`)
@@ -32,22 +33,37 @@ function Diagnosis() {
     const currentTags = selectedTags || [];
     
     if (currentSymptoms.trim() === '' && currentTags.length === 0) {
-      setError("Please describe your symptoms or select at least one from the quick-list above.");
+      toast.error("Please describe your symptoms or select at least one from the quick-list above.");
       return;
     }
     
     setLoading(true);
-    setError('');
     setResult(null);
+
+    const token = localStorage.getItem('vitalcare_token');
+    if (!token) {
+        toast.error("You must be logged in to use the diagnostic tool.");
+        setTimeout(() => window.location.href = '/auth', 2000);
+        return;
+    }
 
     try {
       const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/diagnose`, { 
         symptoms: currentSymptoms,
         selected_symptoms: currentTags
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       setResult(response.data);
+      toast.success("Diagnosis complete!");
     } catch (err) {
-      setError(err.response?.data?.detail || 'An error occurred during diagnosis. Make sure the backend is running.');
+      if (err.response?.status === 401) {
+          toast.error("Session expired. Please log in again.");
+          localStorage.removeItem('vitalcare_token');
+          setTimeout(() => window.location.href = '/auth', 2000);
+      } else {
+          toast.error(err.response?.data?.detail || 'An error occurred during diagnosis. Make sure the backend is running.');
+      }
     } finally {
       setLoading(false);
     }
@@ -60,13 +76,14 @@ function Diagnosis() {
       className="glass-panel"
       style={{ padding: '3rem', maxWidth: '900px', margin: '2rem auto' }}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} style={{ display: 'inline-block' }}>
           <Activity size={64} color="var(--primary-color)" style={{ marginBottom: '1rem' }} />
         </motion.div>
-        <motion.h2 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} style={{ fontSize: '2.8rem', letterSpacing: '-1px' }}>AI-Powered Diagnosis</motion.h2>
+        <motion.h2 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} style={{ fontSize: '2.8rem', letterSpacing: '-1px' }}>AI-Powered Diagnosis v2</motion.h2>
         <motion.p initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} style={{ color: 'var(--text-light)', fontSize: '1.2rem', maxWidth: '600px', margin: '0 auto' }}>
-          Select your symptoms below or describe them in detail. Our advanced neural network will analyze your inputs and instantly predict the condition with medication recommendations.
+          Select your symptoms below or describe them in detail. Our advanced neural network will analyze your inputs using fuzzy matching and instantly predict the condition.
         </motion.p>
       </div>
 
@@ -95,7 +112,7 @@ function Diagnosis() {
             placeholder="E.g., I have a headache in the middle of my head, feeling dizzy..." 
             value={symptoms}
             onChange={(e) => setSymptoms(e.target.value)}
-            style={{ resize: 'vertical' }}
+            style={{ resize: 'vertical', width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}
           ></textarea>
         </div>
         <motion.button 
@@ -110,14 +127,17 @@ function Diagnosis() {
         </motion.button>
       </form>
 
-      {error && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ marginTop: '2rem', padding: '1rem', background: '#fee2e2', color: '#991b1b', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <AlertCircle size={20} />
-          {error}
-        </motion.div>
+      {loading && (
+          <div style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }} style={{ height: '150px', background: '#e2e8f0', borderRadius: '20px' }}></motion.div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} style={{ height: '100px', background: '#e2e8f0', borderRadius: '16px', flex: 1 }}></motion.div>
+                <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }} style={{ height: '100px', background: '#e2e8f0', borderRadius: '16px', flex: 1 }}></motion.div>
+              </div>
+          </div>
       )}
 
-      {result && (
+      {result && !loading && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.9, y: 50 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}

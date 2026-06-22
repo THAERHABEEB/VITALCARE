@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import axios from 'axios';
 import { AuthProvider } from './context/AuthContext';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -11,6 +12,12 @@ import Auth from './pages/Auth';
 import Footer from './components/Footer';
 
 function App() {
+  useEffect(() => {
+    // Ping the backend to wake up Hugging Face space
+    axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/health`)
+      .catch(err => console.log("Health check failed or waking up...", err));
+  }, []);
+
   return (
     <AuthProvider>
       <Router>

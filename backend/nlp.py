@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import re
+from thefuzz import fuzz
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -61,18 +62,24 @@ class MedicalNLP:
             for s in selected_symptoms:
                 matched_symptoms.add(s.lower())
                 
-        # 2. Extract symptoms from free text
-        # Simple substring matching for extracted symptoms
+        # 2. Extract symptoms from free text using fuzzy matching
         for symptom in self.all_symptoms:
             if symptom in user_text:
                 matched_symptoms.add(symptom)
+            else:
+                # Fuzzy partial match for longer multi-word symptoms
+                if len(symptom) > 4:
+                    if fuzz.partial_ratio(symptom, user_text) > 85:
+                        matched_symptoms.add(symptom)
                 
-        # Also do a reverse check: words in user_text that match single-word symptoms
+        # Also do a reverse check: fuzzy word match for single-word symptoms to catch typos
         words = set(re.findall(r'\b\w+\b', user_text))
         for word in words:
-            for symptom in self.all_symptoms:
-                if word == symptom:
-                    matched_symptoms.add(symptom)
+            if len(word) > 3: # ignore very short words
+                for symptom in self.all_symptoms:
+                    if len(symptom.split()) == 1 and len(symptom) > 3:
+                        if fuzz.ratio(word, symptom) > 85:
+                            matched_symptoms.add(symptom)
 
         if not matched_symptoms:
             return {"error": "Could not identify specific medical symptoms from your input. Please try using the quick-select options or describe symptoms more clearly (e.g., 'headache', 'fever', 'nausea')."}
