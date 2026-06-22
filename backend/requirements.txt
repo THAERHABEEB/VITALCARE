@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pandas
+scikit-learn
+sqlalchemy
+passlib
+python-jose
+python-multipart
+pydantic
