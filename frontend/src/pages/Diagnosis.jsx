@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { Activity, AlertCircle, ShieldAlert, Pill, Check, Lock } from 'lucide-react';
+import { Activity, AlertCircle, ShieldAlert, Pill, Check } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Link } from 'react-router-dom';
 
 function Diagnosis() {
   const [symptoms, setSymptoms] = useState('');
@@ -12,15 +11,8 @@ function Diagnosis() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [diagError, setDiagError] = useState(null);
-  const [isAuthorized, setIsAuthorized] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('vitalcare_token');
-    if (!token) {
-        setIsAuthorized(false);
-    }
-
     axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/symptoms`)
       .then(res => setCommonSymptoms(res.data))
       .catch(err => console.error("Failed to load symptoms", err));
@@ -36,71 +28,49 @@ function Diagnosis() {
 
   const handleDiagnose = async (e) => {
     e.preventDefault();
-    
+
     const currentSymptoms = symptoms || '';
     const currentTags = selectedTags || [];
-    setDiagError(null);
-    
+
     if (currentSymptoms.trim() === '' && currentTags.length === 0) {
-      setDiagError("Please describe your symptoms or select at least one from the quick-list above.");
+      toast.error("Please describe your symptoms or select at least one from the quick-list above.");
       return;
     }
-    
+
     setLoading(true);
     setResult(null);
 
     const token = localStorage.getItem('vitalcare_token');
     if (!token) {
-        setIsAuthorized(false);
-        return;
+      toast.error("You must be logged in to use the diagnostic tool.");
+      setTimeout(() => window.location.href = '/auth', 2000);
+      return;
     }
 
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/diagnose`, { 
+      const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/diagnose`, {
         symptoms: currentSymptoms,
         selected_symptoms: currentTags
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setResult(response.data);
+      toast.success("Diagnosis complete!");
     } catch (err) {
       if (err.response?.status === 401) {
-          localStorage.removeItem('vitalcare_token');
-          setIsAuthorized(false);
+        toast.error("Session expired. Please log in again.");
+        localStorage.removeItem('vitalcare_token');
+        setTimeout(() => window.location.href = '/auth', 2000);
       } else {
-          setDiagError(err.response?.data?.detail || 'An error occurred during diagnosis. Make sure the backend is running.');
+        toast.error(err.response?.data?.detail || 'An error occurred during diagnosis. Make sure the backend is running.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isAuthorized) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <motion.div 
-          className="glass-panel"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          style={{ padding: '3rem', textAlign: 'center', maxWidth: '400px', width: '100%' }}
-        >
-          <div style={{ background: '#fee2e2', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 1.5rem auto' }}>
-            <Lock size={40} color="#e11d48" />
-          </div>
-          <h3 style={{ fontSize: '1.8rem', color: 'var(--bg-dark)', marginBottom: '1rem' }}>Access Denied</h3>
-          <p style={{ color: 'var(--text-light)', marginBottom: '2rem' }}>You must be logged in to use the diagnostic AI engine.</p>
-          <Link to="/auth" style={{ textDecoration: 'none' }}>
-            <button className="btn-primary" style={{ width: '100%', padding: '0.8rem', fontSize: '1.1rem' }}>
-              Sign In to Continue
-            </button>
-          </Link>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="glass-panel"
@@ -123,8 +93,8 @@ function Diagnosis() {
         </h4>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
           {commonSymptoms.map((sym, idx) => (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               onClick={() => toggleTag(sym)}
               className={`symptom-tag ${selectedTags.includes(sym) ? 'selected' : ''}`}
             >
@@ -137,38 +107,16 @@ function Diagnosis() {
       <form onSubmit={handleDiagnose} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div>
           <h4 style={{ marginBottom: '0.5rem' }}>Describe your condition</h4>
-          <textarea 
-            rows="5" 
-            placeholder="E.g., I have a headache in the middle of my head, feeling dizzy..." 
+          <textarea
+            rows="5"
+            placeholder="E.g., I have a headache in the middle of my head, feeling dizzy..."
             value={symptoms}
-            onChange={(e) => { setSymptoms(e.target.value); setDiagError(null); }}
+            onChange={(e) => setSymptoms(e.target.value)}
             style={{ resize: 'vertical', width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}
           ></textarea>
         </div>
-
-        {diagError && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            style={{ 
-              background: '#fef2f2', 
-              border: '1px solid #fecaca', 
-              color: '#b91c1c', 
-              padding: '1.2rem', 
-              borderRadius: '12px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.8rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-            }}
-          >
-            <AlertCircle size={24} color="#dc2626" />
-            <span style={{ fontSize: '1.05rem', lineHeight: '1.5' }}>{diagError}</span>
-          </motion.div>
-        )}
-
-        <motion.button 
-          type="submit" 
+        <motion.button
+          type="submit"
           className="btn-primary"
           disabled={loading}
           whileHover={{ scale: 1.02 }}
@@ -180,23 +128,23 @@ function Diagnosis() {
       </form>
 
       {loading && (
-          <div style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }} style={{ height: '150px', background: '#e2e8f0', borderRadius: '20px' }}></motion.div>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} style={{ height: '100px', background: '#e2e8f0', borderRadius: '16px', flex: 1 }}></motion.div>
-                <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }} style={{ height: '100px', background: '#e2e8f0', borderRadius: '16px', flex: 1 }}></motion.div>
-              </div>
+        <div style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }} style={{ height: '150px', background: '#e2e8f0', borderRadius: '20px' }}></motion.div>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }} style={{ height: '100px', background: '#e2e8f0', borderRadius: '16px', flex: 1 }}></motion.div>
+            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }} style={{ height: '100px', background: '#e2e8f0', borderRadius: '16px', flex: 1 }}></motion.div>
           </div>
+        </div>
       )}
 
       {result && !loading && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 50 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 100, damping: 20 }}
           style={{ marginTop: '3rem', borderTop: '2px solid rgba(13, 148, 136, 0.1)', paddingTop: '3rem' }}
         >
-          <motion.div 
+          <motion.div
             initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2 }}
             style={{ background: 'linear-gradient(135deg, var(--bg-dark), var(--primary-color))', color: 'white', padding: '2.5rem', borderRadius: '20px', marginBottom: '2.5rem', boxShadow: '0 20px 40px rgba(99, 102, 241, 0.2)' }}
           >
@@ -222,10 +170,10 @@ function Diagnosis() {
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
                 {result.precautions.map((p, i) => (
-                  <motion.div 
-                    whileHover={{ scale: 1.05, y: -5 }} 
-                    key={i} 
-                    className="glass-panel" 
+                  <motion.div
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    key={i}
+                    className="glass-panel"
                     style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 14px rgba(0,0,0,0.05)' }}
                   >
                     <div style={{ background: 'var(--bg-light)', padding: '0.8rem', borderRadius: '50%' }}>
@@ -245,10 +193,10 @@ function Diagnosis() {
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
                 {result.medicines.map((med, idx) => (
-                  <motion.div 
-                    whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(99,102,241,0.2)' }} 
-                    key={idx} 
-                    className="glass-panel" 
+                  <motion.div
+                    whileHover={{ y: -10, boxShadow: '0 20px 40px rgba(99,102,241,0.2)' }}
+                    key={idx}
+                    className="glass-panel"
                     style={{ padding: '2rem', background: '#ffffff', borderRadius: '20px', display: 'flex', flexDirection: 'column' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '2px dashed #e2e8f0' }}>
@@ -277,6 +225,29 @@ function Diagnosis() {
         </motion.div>
       )}
     </motion.div>
+  );
+}
+
+export default Diagnosis;
+{ med.image_url && <img src={med.image_url} alt={med.name} style={{ width: '100%', height: '180px', objectFit: 'contain', marginBottom: '1.5rem', borderRadius: '12px', background: '#f8fafc', padding: '1rem' }} /> }
+<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
+  <div style={{ background: 'var(--bg-light)', padding: '1rem', borderRadius: '12px' }}>
+    <p style={{ fontSize: '0.85rem', color: 'var(--primary-color)', margin: '0 0 0.3rem 0', fontWeight: 700, textTransform: 'uppercase' }}>Composition</p>
+    <p style={{ fontSize: '0.95rem', color: 'var(--text-dark)', margin: 0, fontWeight: 500 }}>{med.composition}</p>
+  </div>
+  <div style={{ background: '#fff1f2', padding: '1rem', borderRadius: '12px' }}>
+    <p style={{ fontSize: '0.85rem', color: '#e11d48', margin: '0 0 0.3rem 0', fontWeight: 700, textTransform: 'uppercase' }}>Side effects</p>
+    <p style={{ fontSize: '0.95rem', color: 'var(--text-dark)', margin: 0, fontWeight: 500 }}>{med.side_effects}</p>
+  </div>
+</div>
+                  </motion.div >
+                ))}
+              </div >
+            </motion.div >
+          )}
+        </motion.div >
+      )}
+    </motion.div >
   );
 }
 
