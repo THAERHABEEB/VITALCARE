@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { Activity, AlertCircle, ShieldAlert, Pill, Check } from 'lucide-react';
+import { Activity, AlertCircle, ShieldAlert, Pill, Check, Lock } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { Link } from 'react-router-dom';
 
 function Diagnosis() {
   const [symptoms, setSymptoms] = useState('');
@@ -11,8 +12,14 @@ function Diagnosis() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem('vitalcare_token');
+    if (!token) {
+        setIsAuthorized(false);
+    }
+
     axios.get(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/symptoms`)
       .then(res => setCommonSymptoms(res.data))
       .catch(err => console.error("Failed to load symptoms", err));
@@ -42,8 +49,7 @@ function Diagnosis() {
 
     const token = localStorage.getItem('vitalcare_token');
     if (!token) {
-        toast.error("You must be logged in to use the diagnostic tool.");
-        setTimeout(() => window.location.href = '/auth', 2000);
+        setIsAuthorized(false);
         return;
     }
 
@@ -58,9 +64,8 @@ function Diagnosis() {
       toast.success("Diagnosis complete!");
     } catch (err) {
       if (err.response?.status === 401) {
-          toast.error("Session expired. Please log in again.");
           localStorage.removeItem('vitalcare_token');
-          setTimeout(() => window.location.href = '/auth', 2000);
+          setIsAuthorized(false);
       } else {
           toast.error(err.response?.data?.detail || 'An error occurred during diagnosis. Make sure the backend is running.');
       }
@@ -68,6 +73,30 @@ function Diagnosis() {
       setLoading(false);
     }
   };
+
+  if (!isAuthorized) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <motion.div 
+          className="glass-panel"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          style={{ padding: '3rem', textAlign: 'center', maxWidth: '400px', width: '100%' }}
+        >
+          <div style={{ background: '#fee2e2', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 1.5rem auto' }}>
+            <Lock size={40} color="#e11d48" />
+          </div>
+          <h3 style={{ fontSize: '1.8rem', color: 'var(--bg-dark)', marginBottom: '1rem' }}>Access Denied</h3>
+          <p style={{ color: 'var(--text-light)', marginBottom: '2rem' }}>You must be logged in to use the diagnostic AI engine.</p>
+          <Link to="/auth" style={{ textDecoration: 'none' }}>
+            <button className="btn-primary" style={{ width: '100%', padding: '0.8rem', fontSize: '1.1rem' }}>
+              Sign In to Continue
+            </button>
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <motion.div 

@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { Users, Award, Calendar, TrendingUp, Activity, FileText, Target, Search, Clock } from 'lucide-react';
+import { Users, Award, Calendar, TrendingUp, Activity, FileText, Target, Search, Clock, Lock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Link } from 'react-router-dom';
 
 const trafficData = [
   { name: 'Jan', patients: 400, accuracy: 92 },
@@ -26,23 +25,16 @@ const diseaseData = [
 
 const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#f97316'];
 
-const recentActivity = [
-  { id: 1, user: "Ahmed Y.", action: "Diagnosed with Migraine", time: "2 mins ago" },
-  { id: 2, user: "Sarah K.", action: "Read 'Managing Allergy'", time: "15 mins ago" },
-  { id: 3, user: "Dr. Hassan", action: "Updated database records", time: "1 hr ago" },
-  { id: 4, user: "Mona L.", action: "Searched for 'GERD symptoms'", time: "2 hrs ago" },
-  { id: 5, user: "System", action: "AI Model Retrained (Accuracy 99%)", time: "5 hrs ago" }
-];
-
 function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('vitalcare_token');
     if (!token) {
-        toast.error("Unauthorized access. Redirecting to login...");
-        setTimeout(() => window.location.href = '/auth', 2000);
+        setIsAuthorized(false);
+        setLoading(false);
         return;
     }
 
@@ -56,13 +48,10 @@ function Dashboard() {
       .catch(err => {
           console.error(err);
           if (err.response?.status === 401) {
-              toast.error("Session expired. Please log in again.");
               localStorage.removeItem('vitalcare_token');
-              setTimeout(() => window.location.href = '/auth', 2000);
-          } else {
-              toast.error("Failed to load dashboard data.");
-              setLoading(false);
+              setIsAuthorized(false);
           }
+          setLoading(false);
       });
   }, []);
 
@@ -76,9 +65,32 @@ function Dashboard() {
     visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 200, damping: 15 } }
   };
 
+  if (!isAuthorized) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <motion.div 
+          className="glass-panel"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          style={{ padding: '3rem', textAlign: 'center', maxWidth: '400px', width: '100%' }}
+        >
+          <div style={{ background: '#fee2e2', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 1.5rem auto' }}>
+            <Lock size={40} color="#e11d48" />
+          </div>
+          <h3 style={{ fontSize: '1.8rem', color: 'var(--bg-dark)', marginBottom: '1rem' }}>Access Denied</h3>
+          <p style={{ color: 'var(--text-light)', marginBottom: '2rem' }}>You must be logged in to view the platform analytics and dashboard.</p>
+          <Link to="/auth" style={{ textDecoration: 'none' }}>
+            <button className="btn-primary" style={{ width: '100%', padding: '0.8rem', fontSize: '1.1rem' }}>
+              Sign In
+            </button>
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ marginTop: '2rem', paddingBottom: '4rem' }}>
-      <ToastContainer position="top-right" autoClose={3000} />
       <h2 style={{ fontSize: '3rem', letterSpacing: '-1px' }}>Platform Analytics</h2>
       <p style={{ color: 'var(--text-light)', marginBottom: '3rem', fontSize: '1.2rem' }}>Comprehensive real-time statistics for VitalCare AI.</p>
 
