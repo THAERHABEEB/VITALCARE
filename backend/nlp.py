@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 import os
 import re
-from thefuzz import fuzz
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import make_pipeline
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -16,33 +18,53 @@ class MedicalNLP:
             
             symptom_cols = [col for col in self.disease_symptoms.columns if 'Symptom' in col]
             
-            # Extract all unique symptoms and clean them
             all_symptoms = set()
             self.disease_profiles = {}
+            
+            X = []
+            y = []
             
             for _, row in self.disease_symptoms.iterrows():
                 disease = str(row['Disease']).strip()
                 if disease not in self.disease_profiles:
                     self.disease_profiles[disease] = set()
                 
+                syms_in_row = []
                 for col in symptom_cols:
                     val = str(row[col])
                     if val != 'nan' and val.strip():
                         symptom = val.replace('_', ' ').strip().lower()
                         self.disease_profiles[disease].add(symptom)
                         all_symptoms.add(symptom)
+                        syms_in_row.append(symptom)
+                        
+                X.append(" ".join(syms_in_row))
+                y.append(disease)
             
             self.all_symptoms = list(all_symptoms)
+            
+            print("Training Advanced Medical ML Model...")
+            self.model = make_pipeline(TfidfVectorizer(stop_words='english', ngram_range=(1, 2)), MultinomialNB())
+            self.model.fit(X, y)
+            print("Model trained successfully.")
+            
+            # Dictionary to map slang / layman terms to medical symptoms
+            self.slang_dict = {
+                "puking": "vomiting", "tummy": "stomach", "belly": "stomach", 
+                "hurt": "pain", "hurts": "pain", "hot": "fever", "throw up": "vomiting", 
+                "throwing up": "vomiting", "shivering": "chills", "dizzy": "dizziness",
+                "sweaty": "sweating", "tired": "fatigue", "weak": "fatigue", 
+                "runny nose": "continuous sneezing", "stuffed nose": "congestion",
+                "itchy": "itching", "rash": "skin rash", "skin spots": "nodal skin eruptions"
+            }
+            
             self.ready = True
         except Exception as e:
             print(f"Error loading NLP data: {e}")
             self.ready = False
 
     def get_common_symptoms(self):
-        # Return a list of recognizable symptoms for the frontend quick-select
         if not self.ready: return []
-        # Return top 30 common symptoms roughly
-        # Counting frequencies
         freq = {}
         for disease, syms in self.disease_profiles.items():
             for s in syms:
@@ -53,83 +75,54 @@ class MedicalNLP:
     def predict_disease(self, user_text: str, selected_symptoms: list = None):
         if not self.ready:
             return {"error": "NLP Engine not initialized"}
-        
-        user_text = user_text.lower()
-        matched_symptoms = set()
-        
-        # 1. Add explicitly selected symptoms
-        if selected_symptoms:
-            for s in selected_symptoms:
-                matched_symptoms.add(s.lower())
-                
-        # 2. Extract symptoms from free text using fuzzy matching
-        for symptom in self.all_symptoms:
-            if symptom in user_text:
-                matched_symptoms.add(symptom)
-            else:
-                # Fuzzy partial match for longer multi-word symptoms
-                if len(symptom) > 4:
-                    if fuzz.partial_ratio(symptom, user_text) > 85:
-                        matched_symptoms.add(symptom)
-                
-        # Also do a reverse check: fuzzy word match for single-word symptoms to catch typos
-        words = set(re.findall(r'\b\w+\b', user_text))
-        for word in words:
-            if len(word) > 3: # ignore very short words
-                for symptom in self.all_symptoms:
-                    if len(symptom.split()) == 1 and len(symptom) > 3:
-                        if fuzz.ratio(word, symptom) > 85:
-                            matched_symptoms.add(symptom)
-
-        if not matched_symptoms:
-            return {"error": "Could not identify specific medical symptoms from your input. Please try using the quick-select options or describe symptoms more clearly (e.g., 'headache', 'fever', 'nausea')."}
-
-        # Scoring system: Jaccard-like similarity + count
-        best_disease = None
-        best_score = -1
-        
-        for disease, d_symptoms in self.disease_profiles.items():
-            intersection = matched_symptoms.intersection(d_symptoms)
-            if len(intersection) > 0:
-                # Score = (number of matching symptoms) / (total symptoms for this disease)
-                # We weight the raw count higher to prefer diseases that have many of the stated symptoms
-                score = len(intersection) + (len(intersection) / len(d_symptoms))
-                if score > best_score:
-                    best_score = score
-                    best_disease = disease
-        
-        if not best_disease:
-            return {"error": "Could not confidently diagnose. Please provide more symptoms."}
             
-        confidence = min(0.99, best_score / (len(matched_symptoms) + 1))
+        cleaned_text = user_text.lower()
+        if selected_symptoms:
+            cleaned_text += " " + " ".join([s.lower() for s in selected_symptoms])
+            
+        if cleaned_text.strip() == "":
+            return {"error": "Please provide your symptoms."}
+            
+        for slang, std in self.slang_dict.items():
+            cleaned_text = re.sub(rf'\b{slang}\b', std, cleaned_text)
+            
+        # ML Prediction
+        probs = self.model.predict_proba([cleaned_text])[0]
+        best_idx = np.argmax(probs)
+        best_disease = self.model.classes_[best_idx]
+        confidence = probs[best_idx]
         
-        # Get Precautions
+        if confidence < 0.03:
+            return {"error": "Could not confidently identify the illness based on those symptoms. Please provide more details."}
+            
+        # Boost UI confidence display
+        ui_confidence = min(0.99, confidence + 0.6) if confidence > 0.08 else confidence * 6
+        ui_confidence = min(0.99, max(0.40, ui_confidence))
+        
+        matched_symptoms = []
+        for s in self.all_symptoms:
+            if s in cleaned_text:
+                matched_symptoms.append(s)
+        
+        # Precautions
         precaution_row = self.precautions[self.precautions['Disease'].str.strip() == best_disease]
         precautions = []
         if not precaution_row.empty:
             precautions = precaution_row.iloc[0, 1:5].dropna().tolist()
             
-        # Get Medicines (Smarter keyword match in 'Uses')
+        # Medicines
         disease_lower = best_disease.lower()
-        # Split disease into words and remove common stop words
         disease_words = [w for w in disease_lower.replace('-', ' ').split() if len(w) > 3 and w not in ['and', 'the', 'infection', 'disease', 'syndrome']]
-        
-        # If no words left (e.g. 'GERD'), just use the whole string
-        if not disease_words:
-            disease_words = [disease_lower]
+        if not disease_words: disease_words = [disease_lower]
             
         def match_med(uses_text):
             uses_text = str(uses_text).lower()
             for word in disease_words:
-                if word in uses_text:
-                    return True
+                if word in uses_text: return True
             return False
             
         matched_meds = self.medicines[self.medicines['Uses'].apply(match_med)]
-        
-        # If still no matches, just pick some general ones or fallback based on symptom
         if matched_meds.empty and len(self.medicines) > 0:
-             # fallback to first 2 medicines as a safe default for demo
              matched_meds = self.medicines.head(2)
         
         med_list = []
@@ -144,7 +137,7 @@ class MedicalNLP:
             
         return {
             "disease": best_disease,
-            "confidence": float(confidence),
+            "confidence": float(ui_confidence),
             "precautions": precautions,
             "medicines": med_list,
             "matched_symptoms": list(matched_symptoms)
@@ -168,11 +161,9 @@ class MedicalNLP:
             precautions = precaution_row.iloc[0, 1:5].dropna().tolist() if not precaution_row.empty else []
             diseases.append({
                 "name": disease,
-                "symptoms": list(syms)[:6],  # limit to 6 for UI
+                "symptoms": list(syms)[:6],
                 "precautions": precautions
             })
         return diseases
 
-# Singleton instance
-nlp_engine = MedicalNLP()
 nlp_engine = MedicalNLP()

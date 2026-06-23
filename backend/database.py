@@ -3,6 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Fallback to local SQLite if DATABASE_URL is not set
@@ -34,8 +37,12 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
 
-Base.metadata.create_all(bind=engine)
-
+try:
+    Base.metadata.create_all(bind=engine)
+    print("Database connected and tables verified successfully.")
+except Exception as e:
+    print(f"CRITICAL ERROR connecting to Database: {e}")
+    print("WARNING: Server started but database is offline. Endpoints requiring DB may fail.")
 def get_db():
     db = SessionLocal()
     try:
